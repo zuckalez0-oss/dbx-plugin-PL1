@@ -1,4 +1,3 @@
-
 import os
 import re
 import math
@@ -12,7 +11,6 @@ from reportlab.lib.utils import ImageReader
 import matplotlib.pyplot as plt
 from ezdxf.addons.drawing import RenderContext, Frontend
 from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
-# Importando as configurações para forçar o Monocromático
 from ezdxf.addons.drawing.config import Configuration, ColorPolicy, BackgroundPolicy
 
 def gerar_pdf_padrao(caminho_pdf, dados_peca, caminho_img_peca):
@@ -43,7 +41,7 @@ def gerar_pdf_padrao(caminho_pdf, dados_peca, caminho_img_peca):
     c.rect(margem, topo_selo - 20, largura_a4 - (margem * 2), 20, fill=1, stroke=1)
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(margem + 10, topo_selo - 14, "LYPSYOS - DBX V4")
+    c.drawString(margem + 10, topo_selo - 14, "NOROACO- DBX V4")
     c.drawRightString(largura_a4 - margem - 10, topo_selo - 14, "DESENHO TÉCNICO DE PEÇA PARA CORTE")
     
     c.setFont("Helvetica", 7)
@@ -83,11 +81,10 @@ def gerar_pdf_padrao(caminho_pdf, dados_peca, caminho_img_peca):
     c.line(margem + 480, topo_selo - 20, margem + 480, topo_selo - 52)
     c.line(margem + 250, topo_selo - 52, margem + 250, topo_selo - 90)
 
-    # --- NOVO: BLOCO DE TOLERÂNCIA (RODAPÉ DO SELO) ---
-    c.line(margem, topo_selo - 90, largura_a4 - margem, topo_selo - 90) # Linha que fecha a parte de cima
+    # BLOCO DE TOLERÂNCIA
+    c.line(margem, topo_selo - 90, largura_a4 - margem, topo_selo - 90)
     c.setFont("Helvetica-Bold", 8)
-    c.setFillColor(colors.HexColor("#444444")) # Cinza bem escuro para o texto não brigar com os dados principais
-    # \u00B1 é o código para o símbolo de ± (Mais ou Menos)
+    c.setFillColor(colors.HexColor("#444444"))
     c.drawCentredString(largura_a4 / 2.0, topo_selo - 108, "NOTA DE FABRICAÇÃO: PODE HAVER VARIAÇÃO DIMENSIONAL DE \u00B1 2 mm")
 
     c.save()
@@ -101,7 +98,7 @@ def processar_dxf_multiplas_pecas(caminho_dxf, pasta_destino):
     textos_validos = []
 
     for texto in msp.query('TEXT MTEXT'):
-        if texto.dxf.layer.upper() == 'TEXTO':
+        if hasattr(texto.dxf, 'layer') and texto.dxf.layer.upper() == 'TEXTO':
             match = padrao.search(texto.dxf.text)
             if match:
                 textos_validos.append({
@@ -123,15 +120,17 @@ def processar_dxf_multiplas_pecas(caminho_dxf, pasta_destino):
         print(f"[{os.path.basename(caminho_dxf)}] Nenhum texto válido na layer TEXTO.")
         return
 
-    # 2. Agrupar Geometrias E COTAS
-    # Incluímos DIMENSION (Cota nativa) e LEADER (Setas) na busca
+    # 2. Agrupar Geometrias E COTAS (Agora inclui DOBRAS)
     todas_entidades = msp.query('LINE ARC CIRCLE LWPOLYLINE POLYLINE DIMENSION LEADER MTEXT TEXT')
     
+    # Adicionadas as layers de dobra na lista de permitidas
+    layers_permitidas = ['CONTORNO', 'COTAS', 'COTA', 'DIM', 'DOBRAS', 'DOBRA']
+
     for ent in todas_entidades:
-        layer_entidade = ent.dxf.layer.upper()
+        layer_entidade = ent.dxf.layer.upper() if hasattr(ent.dxf, 'layer') else ''
         
-        # Filtro: Pega a entidade se ela for da layer CONTORNO ou se for uma entidade de COTA/TEXTO solta
-        if layer_entidade in ['CONTORNO', 'COTAS', 'COTA', 'DIM'] or ent.dxftype() in ['DIMENSION', 'LEADER']:
+        # Filtro de coleta atualizado
+        if layer_entidade in layers_permitidas or ent.dxftype() in ['DIMENSION', 'LEADER']:
             ext = bbox.extents([ent])
             if ext.has_data:
                 centro_x = (ext.extmax.x + ext.extmin.x) / 2
@@ -154,8 +153,15 @@ def processar_dxf_multiplas_pecas(caminho_dxf, pasta_destino):
         if not t['entidades_geometria']:
             continue
 
-        # Calcula as dimensões filtrando APENAS as geometrias de contorno (ignora o tamanho da cota)
-        entidades_contorno = [e for e in t['entidades_geometria'] if e.dxftype() not in ['DIMENSION', 'LEADER', 'TEXT', 'MTEXT']]
+        # Calcula as dimensões filtrando EXCLUSIVAMENTE a layer CONTORNO.
+        # Isso impede que o espaço vazio e a vista da dobra afetem o tamanho anotado no selo.
+        entidades_contorno = [
+            e for e in t['entidades_geometria'] 
+            if e.dxftype() not in ['DIMENSION', 'LEADER', 'TEXT', 'MTEXT'] 
+            and hasattr(e.dxf, 'layer') 
+            and e.dxf.layer.upper() == 'CONTORNO'
+        ]
+        
         if entidades_contorno:
             ext_peca = bbox.extents(entidades_contorno)
             if ext_peca.has_data:
@@ -174,7 +180,6 @@ def processar_dxf_multiplas_pecas(caminho_dxf, pasta_destino):
             ax.set_aspect('equal')
             ax.set_axis_off()
 
-            # Força o renderizador a desenhar TUDO em preto com fundo branco
             config_monocromatico = Configuration(
                 background_policy=BackgroundPolicy.CUSTOM,
                 custom_bg_color="#FFFFFF",
@@ -185,6 +190,7 @@ def processar_dxf_multiplas_pecas(caminho_dxf, pasta_destino):
             out = MatplotlibBackend(ax)
             frontend = Frontend(ctx, out, config=config_monocromatico)
             
+            # Desenha tudo que foi agrupado (Contorno + Dobra + Cotas)
             frontend.draw_entities(t['entidades_geometria'])
             ax.autoscale(enable=True, axis='both', tight=True)
 
@@ -210,10 +216,9 @@ if __name__ == "__main__":
     if not os.path.exists(PASTA_ENTRADA): os.makedirs(PASTA_ENTRADA)
     if not os.path.exists(PASTA_SAIDA): os.makedirs(PASTA_SAIDA)
     
-    print("Iniciando extração com renderização Monocromática e Cotas...")
+    print("Iniciando extração com renderização Monocromática, Cotas e Dobras...")
     for item in os.listdir(PASTA_ENTRADA):
         if item.lower().endswith('.dxf'):
             print(f"\nLendo arquivo master: {item}")
             caminho_completo = os.path.join(PASTA_ENTRADA, item)
             processar_dxf_multiplas_pecas(caminho_completo, PASTA_SAIDA)
-
