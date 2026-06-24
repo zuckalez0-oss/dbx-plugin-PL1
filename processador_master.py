@@ -46,7 +46,8 @@ class ProcessadorMaster:
                             "identificador": match.group(2),
                             "espessura": match.group(3).replace('.', ',') + " mm",
                             "quantidade": match.group(4),
-                            "forma": "Plani/Dobrada",
+                            # ALTERAÇÃO: Valor padrão ajustado para peças normais de corte
+                            "forma": "Retangular", 
                             "dimensoes": "-",
                             "furacoes": "Sem furação"
                         }
@@ -86,6 +87,20 @@ class ProcessadorMaster:
             if not t['entidades_geometria']:
                 continue
 
+            # --- NOVA LÓGICA DIDÁTICA ---
+            # Verifica se entre as entidades capturadas existe alguma da layer DOBRA/DOBRAS
+            tem_dobra = any(
+                hasattr(e.dxf, 'layer') and e.dxf.layer.upper() in ['DOBRA', 'DOBRAS'] 
+                for e in t['entidades_geometria']
+            )
+            
+            # Atualiza o dicionário dinamicamente
+            if tem_dobra:
+                t['dados']['forma'] = "Plani/Dobrada"
+            else:
+                t['dados']['forma'] = "Retangular"
+            # ----------------------------
+
             # Filtro exclusivo de contorno: Ignora cotas, textos e a vista da dobra
             entidades_contorno = [
                 e for e in t['entidades_geometria'] 
@@ -112,11 +127,9 @@ class ProcessadorMaster:
 
             try:
                 # PASSO A: Chamar Módulo DXF
-                # ALTERAÇÃO AQUI: Enviando APENAS as `entidades_contorno` para o arquivo de máquina
                 ExportadorDXF.criar_dxf_peca(doc, entidades_contorno, caminho_saida_dxf)
                 
                 # PASSO B: Renderização de Imagem para o PDF
-                # Aqui continuamos enviando `t['entidades_geometria']` pois o PDF deve exibir tudo (cotas, dobras, etc)
                 fig = plt.figure()
                 ax = fig.add_axes([0, 0, 1, 1])
                 ax.set_aspect('equal')
