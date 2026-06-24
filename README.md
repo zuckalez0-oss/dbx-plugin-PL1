@@ -94,16 +94,12 @@ Pronto! Um clique no novo ícone e o comando de limpeza será executado
 
 ---
 
-# Manual de Configuracao de Desenho:
-
----
+# Manual de Configuracao de Desenho: ( 📦 Processador DXF Master )
 
 
-# 📦 Processador DXF Master
 
 Automação para separação, tratamento e geração de arquivos DXF e PDF a partir de um desenho master.
 
----
 
 # 🔧 Fluxo de Processamento
 
