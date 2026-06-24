@@ -257,5 +257,5 @@ Após a execução:
 
 ✅ O arquivo Master é resetado automaticamente para o próximo lote.
 
-```
+
 
