@@ -98,7 +98,7 @@ Pronto! Um clique no novo ícone e o comando de limpeza será executado
 
 ---
 
-````markdown
+
 # 📦 Processador DXF Master
 
 Automação para separação, tratamento e geração de arquivos DXF e PDF a partir de um desenho master.
@@ -262,4 +262,4 @@ Após a execução:
 ✅ O arquivo Master é resetado automaticamente para o próximo lote.
 
 ```
-```
+
