@@ -91,3 +91,175 @@ Isso é útil para limpar desenhos que não serão processados pelo script ou pa
 4.  Arraste esse comando para a sua barra de ferramentas (Ribbon ou Toolbar) e escolha um ícone.
 
 Pronto! Um clique no novo ícone e o comando de limpeza será executado
+
+---
+
+# Manual de Configuracao de Desenho:
+
+---
+
+````markdown
+# 📦 Processador DXF Master
+
+Automação para separação, tratamento e geração de arquivos DXF e PDF a partir de um desenho master.
+
+---
+
+# 🔧 Fluxo de Processamento
+
+## 1. ✏️ Preparação no CAD (Desenho Master)
+
+Antes de executar o sistema, verifique se todas as entidades estão organizadas corretamente nas layers padronizadas:
+
+| Tipo de Entidade | Layer |
+|------------------|--------|
+| Linhas de Corte | `CONTORNO` |
+| Linhas de Dobra | `DOBRA` ou `DOBRAS` |
+| Textos / Âncoras | `TEXTO` |
+
+### Atualização das Âncoras
+
+Cada peça deve possuir uma âncora de identificação no seguinte formato:
+
+```text
+PROJETO_NOME-PECA_ESPESSURA (QTDx)
+````
+
+**Exemplo:**
+
+```text
+1025_Suporte-Motor_2.0 (4x)
+```
+
+---
+
+## 2. 📥 Entrada de Dados
+
+1. Salve o arquivo DXF Master.
+2. Copie o arquivo para a pasta de entrada:
+
+```text
+./dxf_entrada/
+```
+
+---
+
+## 3. 🚀 Processamento
+
+Execute o processador principal:
+
+```bash
+python processador_master.py
+```
+
+### Processos executados automaticamente
+
+O sistema realiza as seguintes etapas:
+
+1. Mapeamento das âncoras de texto.
+2. Agrupamento das geometrias por proximidade.
+3. Verificação de dobras.
+
+   * Classificação automática:
+
+     * `Plani/Dobrada`
+     * `Retangular`
+4. Exportação do DXF limpo para o CAM.
+
+   * Posicionamento automático no eixo `0,0`.
+5. Geração do PDF técnico.
+
+   * Cotas automáticas.
+   * Selo padronizado.
+   * Exibição das dobras.
+
+---
+
+## 4. 📤 Verificação das Saídas
+
+Após o processamento, verifique os arquivos gerados:
+
+### 📂 dxf_saida
+
+Arquivos destinados à máquina de corte (Laser ou Plasma).
+
+**Características:**
+
+* Contém apenas a layer `CONTORNO`
+* Posicionados automaticamente em `0,0`
+* Prontos para importação no CAM
+
+```text
+./dxf_saida/
+```
+
+### 📂 pdf_saida
+
+Arquivos destinados à documentação técnica.
+
+**Características:**
+
+* Todas as layers preservadas
+* Exibição de dobras
+* Cotas automáticas
+* Selo técnico padronizado
+
+```text
+./pdf_saida/
+```
+
+---
+
+## 5. 🧹 Reset Automático
+
+Ao finalizar o processamento, o sistema executa automaticamente:
+
+1. Abertura do DXF Master original.
+2. Limpeza das entidades das layers:
+
+   * `CONTORNO`
+   * `DOBRA`
+   * `DOBRAS`
+3. Salvamento do arquivo vazio.
+
+Dessa forma, o arquivo permanece pronto para receber um novo lote de peças sem necessidade de intervenção manual.
+
+---
+
+# 📁 Estrutura de Pastas
+
+```text
+projeto/
+│
+├── dxf_entrada/
+│   └── Arquivo_Master.dxf
+│
+├── dxf_saida/
+│   └── Arquivos_CAM.dxf
+│
+├── pdf_saida/
+│   └── Arquivos_Tecnicos.pdf
+│
+├── processador_master.py
+│
+└── README.md
+```
+
+---
+
+# ▶️ Execução Rápida
+
+```bash
+python processador_master.py
+```
+
+Após a execução:
+
+✅ DXFs limpos são gerados em `dxf_saida/`
+
+✅ PDFs técnicos são gerados em `pdf_saida/`
+
+✅ O arquivo Master é resetado automaticamente para o próximo lote.
+
+```
+```
