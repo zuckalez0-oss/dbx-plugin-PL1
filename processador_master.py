@@ -26,6 +26,34 @@ class ProcessadorMaster:
             if not os.path.exists(pasta):
                 os.makedirs(pasta)
 
+    def _limpar_arquivo_master(self, caminho_dxf):
+        """
+        [NOVO MÉTODO INTERNO]
+        Remove todas as entidades das camadas CONTORNO, DOBRAS e DOBRA,
+        deixando o arquivo master de layout limpo após a extração.
+        """
+        try:
+            doc = ezdxf.readfile(caminho_dxf)
+            msp = doc.modelspace()
+            
+            camadas_alvo = {"CONTORNO", "DOBRAS", "DOBRA"}
+            contador_removidos = 0
+            
+            # Converte para lista para evitar erro ao modificar a coleção durante a iteração
+            for entidade in list(msp):
+                if hasattr(entidade.dxf, 'layer'):
+                    layer_nome = entidade.dxf.layer.upper()
+                    if layer_nome in camadas_alvo:
+                        msp.delete_entity(entidade)
+                        contador_removidos += 1
+                        
+            # Salva o arquivo final sobrescrevendo o master
+            doc.saveas(caminho_dxf)
+            print(f" -> [Limpeza Master Concluída] {contador_removidos} entidades de corte/dobra removidas.")
+            
+        except Exception as e:
+            print(f" -> [Erro na Limpeza Master] Não foi possível limpar o arquivo: {e}")
+
     def processar_arquivo_master(self, nome_arquivo):
         caminho_dxf = os.path.join(self.pasta_entrada, nome_arquivo)
         doc = ezdxf.readfile(caminho_dxf)
@@ -46,7 +74,6 @@ class ProcessadorMaster:
                             "identificador": match.group(2),
                             "espessura": match.group(3).replace('.', ',') + " mm",
                             "quantidade": match.group(4),
-                            # ALTERAÇÃO: Valor padrão ajustado para peças normais de corte
                             "forma": "Retangular", 
                             "dimensoes": "-",
                             "furacoes": "Sem furação"
@@ -87,21 +114,16 @@ class ProcessadorMaster:
             if not t['entidades_geometria']:
                 continue
 
-            # --- NOVA LÓGICA DIDÁTICA ---
-            # Verifica se entre as entidades capturadas existe alguma da layer DOBRA/DOBRAS
             tem_dobra = any(
                 hasattr(e.dxf, 'layer') and e.dxf.layer.upper() in ['DOBRA', 'DOBRAS'] 
                 for e in t['entidades_geometria']
             )
             
-            # Atualiza o dicionário dinamicamente
             if tem_dobra:
                 t['dados']['forma'] = "Plani/Dobrada"
             else:
                 t['dados']['forma'] = "Retangular"
-            # ----------------------------
 
-            # Filtro exclusivo de contorno: Ignora cotas, textos e a vista da dobra
             entidades_contorno = [
                 e for e in t['entidades_geometria'] 
                 if e.dxftype() not in ['DIMENSION', 'LEADER', 'TEXT', 'MTEXT'] 
@@ -153,7 +175,7 @@ class ProcessadorMaster:
 
                 # PASSO C: Chamar Módulo PDF Layout
                 GeradorPDFLayout.gerar_pdf_padrao(caminho_saida_pdf, t['dados'], img_temporaria)
-                print(f" -> Processado com Sucesso: {t['dados']['identificador']} [DXF Limpo + PDF Completo]")
+                print(f" -> Processado com Sucesso: {t['dados']['identificador']}")
                 
             except Exception as e:
                 print(f" -> Falha Crítica na peça {t['dados']['identificador']}: {e}")
@@ -161,9 +183,14 @@ class ProcessadorMaster:
                 if os.path.exists(img_temporaria):
                     os.remove(img_temporaria)
 
+        # --- GATILHO DA LIMPEZA ADICIONADO AQUI ---
+        # Roda apenas depois que o loop terminar de processar todas as peças deste arquivo master.
+        self._limpar_arquivo_master(caminho_dxf)
+
+
 if __name__ == "__main__":
     processador = ProcessadorMaster()
-    print("Iniciando Pipeline Avançado: Geração de DXF limpo para CAM e PDF detalhado...")
+    print("Iniciando Pipeline Avançado: Extração, PDFs, e Limpeza Automática do Master...")
     
     for item in os.listdir(processador.pasta_entrada):
         if item.lower().endswith('.dxf'):
